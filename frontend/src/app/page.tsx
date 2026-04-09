@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
+
+// Thêm Logo vào thư mục src/app/ (Sử dụng đường dẫn tuyệt đối hoặc relative)
+import vnaLogo from './logo-vna-mobile.png';
 
 type Message = {
   id: string;
@@ -13,7 +17,7 @@ export default function ChatPage() {
     {
       id: 'welcome',
       role: 'bot',
-      content: 'Xin chào, tôi là NEO - Trợ lý ảo của Vietnam Airlines. Rất vui được hỗ trợ bạn!\n\nDưới đây là một số việc tôi có thể giúp:\n Tra cứu chuyến bay: Kiểm tra tình trạng, giờ cất/hạ cánh (VD: Chuyến VN123 có đúng giờ không?)\n Quản lý vé: Xem lại thông tin đặt chỗ cá nhân.\n Tra cứu giá vé: Tham khảo giá tốt nhất giữa các chặng.\n Quy định hành lý: Tư vấn chi tiết số kiện, số cân xách tay/ký gửi cho từng hạng vé.\n\nBạn cần tôi hỗ trợ vấn đề gì?'
+      content: 'Xin chào, tôi là NEOv2.0 - Trợ lý ảo của Vietnam Airlines. Rất vui được hỗ trợ bạn!\n\nDưới đây là một số việc tôi có thể giúp:\nTra cứu chuyến bay: Kiểm tra tình trạng, giờ cất/hạ cánh\nQuản lý vé: Xem lại thông tin đặt chỗ cá nhân.\nTra cứu giá vé: Tham khảo giá tốt nhất giữa các chặng.\nQuy định hành lý: Tư vấn chi tiết số kiện, số cân xách tay/ký gửi cho từng hạng vé.\n\nBạn cần tôi hỗ trợ vấn đề gì?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -28,12 +32,12 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const handleSubmit = async (e?: React.FormEvent, textOverride?: string) => {
+    if (e) e.preventDefault();
+    const userMsg = textOverride || input.trim();
+    if (!userMsg || isLoading) return;
 
-    const userMsg = input.trim();
-    setInput('');
+    if (!textOverride) setInput('');
     
     // Thêm tin nhắn user vào UI
     const newUserMsg: Message = { id: Date.now().toString(), role: 'user', content: userMsg };
@@ -41,7 +45,6 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // Gọi API FastAPI
       const res = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +52,6 @@ export default function ChatPage() {
       });
 
       if (!res.ok) throw new Error('Network response was not ok');
-      
       const data = await res.json();
       
       let botText = '';
@@ -59,7 +61,6 @@ export default function ChatPage() {
         botText = data.response;
       }
       
-      // Thêm tin nhắn bot vào UI
       const newBotMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
@@ -78,9 +79,11 @@ export default function ChatPage() {
     }
   };
 
-  // Render markdown đơn giản (chỉ bôi đậm và xuống dòng)
+  const handleQuickReply = (text: string) => {
+    handleSubmit(undefined, text);
+  };
+
   const renderMessageContent = (content: string) => {
-    // Chuyển \n thành <br/>, đổi **text** thành <strong>text</strong> (đơn giản hoá markdown)
     const formatted = content
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br/>');
@@ -90,11 +93,16 @@ export default function ChatPage() {
 
   return (
     <div className="chat-container">
+      {/* Header Teal của VNA */}
       <div className="chat-header">
-        <div className="avatar">✈️</div>
-        <div>
-          <h1>NEO Assistant</h1>
-          <p>Vietnam Airlines AI Agent</p>
+        <div className="header-left">
+          <div className="avatar">
+            <Image src={vnaLogo} alt="Vietnam Airlines Logo" width={100} height={30} style={{ objectFit: "contain" }} />
+          </div>
+        </div>
+        <div className="header-actions">
+          <span>⚙️</span>
+          <span>✕</span>
         </div>
       </div>
 
@@ -115,22 +123,46 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="message-form">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Hỏi về chuyến bay, hành lý, giá vé..."
-          className="message-input"
-          disabled={isLoading}
-        />
-        <button type="submit" disabled={!input.trim() || isLoading} className="send-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
-      </form>
+      {/* Gợi ý nếu chỉ mới có tin nhắn Welcome */}
+      {messages.length === 1 && (
+        <div className="quick-replies">
+          <button className="quick-reply-btn" onClick={() => handleQuickReply('Hành lý xách tay hạng phổ thông')}>
+            Hành lý xách tay
+          </button>
+          <button className="quick-reply-btn" onClick={() => handleQuickReply('Tra cứu trạng thái VN123 hnay')}>
+            Chuyến bay hôm nay
+          </button>
+          <button className="quick-reply-btn" onClick={() => handleQuickReply('Giá vé Hà Nội - Sài Gòn')}>
+            Giá vé chặng đi
+          </button>
+          <button className="quick-reply-btn" onClick={() => handleQuickReply('Kiểm tra vé NGUYEN/DUNG BP')}>
+            Quản lý vé
+          </button>
+        </div>
+      )}
+
+      <div className="message-form-container">
+        <form onSubmit={e => handleSubmit(e)} className="message-form">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Nhập câu hỏi của Quý khách tại đây..."
+            className="message-input"
+            disabled={isLoading}
+          />
+          <button type="submit" disabled={!input.trim() || isLoading} className="send-button">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+        <div className="disclaimer">
+          NEO có thể sai sót, hãy kiểm tra thông tin quan trọng.<br/>
+          <a href="#">Điều khoản sử dụng</a>
+        </div>
+      </div>
     </div>
   );
 }
