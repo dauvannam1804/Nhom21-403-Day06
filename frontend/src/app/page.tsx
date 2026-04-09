@@ -10,6 +10,7 @@ type Message = {
   id: string;
   role: 'user' | 'bot';
   content: string;
+  isRatingRequest?: boolean;
 };
 
 export default function ChatPage() {
@@ -22,6 +23,7 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,6 +33,35 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Bộ đếm thời gian 60s đánh giá
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    let timer: NodeJS.Timeout;
+
+    // Chỉ đếm ngược nếu tin nhắn cuối cùng là của bot và chưa từng đánh giá
+    if (lastMsg && lastMsg.role === 'bot' && !lastMsg.isRatingRequest && !hasRated) {
+      timer = setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'bot',
+          content: 'Nếu không còn vấn đề nào khác, Quý khách vui lòng đánh giá mức độ hài lòng để giúp NEO phục vụ tốt hơn nhé!',
+          isRatingRequest: true
+        }]);
+      }, 60000); // Đợi 60 giây (60000 ms)
+    }
+
+    return () => clearTimeout(timer); 
+  }, [messages, hasRated]);
+
+  const handleRate = (stars: number) => {
+    setHasRated(true);
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'bot',
+      content: `Vietnam Airlines xin chân thành cảm ơn Quý khách đã đánh giá ${stars} ⭐. Kính chúc Quý khách một chuyến bay an toàn và tràn ngập niềm vui. Xin chào tạm biệt và hẹn gặp lại! 🎉`
+    }]);
+  };
 
   const handleSubmit = async (e?: React.FormEvent, textOverride?: string) => {
     if (e) e.preventDefault();
@@ -110,6 +141,28 @@ export default function ChatPage() {
         {messages.map((msg) => (
           <div key={msg.id} className={`message ${msg.role}`}>
             {renderMessageContent(msg.content)}
+            
+            {/* Hiển thị thanh đánh giá 5 sao nếu đây là tin nhắn yêu cầu đánh giá */}
+            {msg.isRatingRequest && !hasRated && (
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'center' }}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <span 
+                    key={star} 
+                    onClick={() => handleRate(star)}
+                    style={{ 
+                      cursor: 'pointer', 
+                      fontSize: '28px', 
+                      color: '#D4A017', /* Màu Vàng Gold đặc trưng VNA */
+                      transition: 'transform 0.1s ease',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         
