@@ -33,14 +33,14 @@ body::before {
   z-index: -2;
 }
 
-/* Lớp ảnh sắc nét được thu nhỏ (Scale) nằm ở giữa */
+/* Lớp ảnh sắc nét ở giữa */
 body::after {
   content: "";
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
   background-image: url('/a-14.jpg');
-  background-size: contain; /* Tự động thu nhỏ nhét vừa khung hình */
+  background-size: 100vw auto; /* Vừa vặn chiều ngang màn hình, không bị zoom quá đà */
   background-repeat: no-repeat;
   background-position: center;
   z-index: -1;
