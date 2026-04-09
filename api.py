@@ -17,6 +17,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = "default_session"
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
@@ -26,7 +27,7 @@ async def chat_endpoint(request: ChatRequest):
     try:
         # Chạy workflow thông qua LangGraph
         # Vì main.py sử dụng checkpointer (MemorySaver) nên phải truyền config thread_id vào để LangGraph lưu lịch sử
-        config = {"configurable": {"thread_id": "front_end_session_1"}}
+        config = {"configurable": {"thread_id": request.session_id}}
         final_state = graph_app.invoke(initial_state, config)
         
         # Tin nhắn cuối cùng trong state là câu trả lời của AI

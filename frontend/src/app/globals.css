@@ -48,9 +48,9 @@ body::after {
 
 .chat-container {
   width: 100%;
-  max-width: 380px; /* Thu hẹp lại giống bản gốc */
-  height: 600px; /* Chiều cao cố định */
-  max-height: 85vh;
+  max-width: 440px; /* Tăng chiều rộng lên một chút */
+  height: 680px; /* Tăng chiều cao lên để hiện nhiều nội dung hơn */
+  max-height: 90vh;
   /* Hiệu ứng Kính Mờ (Glassmorphism) */
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px);
