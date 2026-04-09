@@ -15,3 +15,6 @@ class AgentState(TypedDict):
     
     # Trạng thái hiện tại của flow (ví dụ: 'flight_info', 'ticket_info', v.v.)
     current_intent: str
+
+    # Cờ để kiểm tra xem kết quả có phải từ cache không
+    is_cached: bool
