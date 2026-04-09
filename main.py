@@ -1,7 +1,8 @@
 import os
 import json
 from dotenv import load_dotenv
-from typing import TypedDict, Annotated, List
+from typing import TypedDict, Annotated, List, Optional
+from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -22,23 +23,18 @@ def load_prompt(file_name: str) -> str:
         return f.read()
 
 def manage_memory_and_cache(state: AgentState):
-    """Giữ 5 lượt chat gần nhất và kiểm tra Cache."""
+    """Giữ lượt chat gần nhất và kiểm tra Cache."""
     messages = state["messages"]
     
-    # 1. Cắt tỉa memory (giữ 5 lượt = 10 messages)
     if len(messages) > 10:
         messages = messages[-10:]
     
     # 2. Kiểm tra Cache
-    # Lấy câu hỏi hiện tại
     current_user_msg = messages[-1].content.strip().lower()
-    
-    # Tìm trong lịch sử các HumanMessage cũ (trừ cái cuối cùng)
     for i in range(len(messages) - 2, -1, -1):
         msg = messages[i]
         if isinstance(msg, HumanMessage) and msg.content.strip().lower() == current_user_msg:
-            # Nếu tìm thấy câu hỏi trùng, lấy câu trả lời (AIMessage) ngay sau nó
-            if i + 1 < len(messages) and not isinstance(messages[i+1], HumanMessage):
+            if i + 1 < len(messages) and isinstance(messages[i+1], AIMessage):
                 cached_response = messages[i+1].content
                 return {
                     "messages": messages, 
@@ -75,7 +71,7 @@ def intent_classifier(state: AgentState):
     return {"current_intent": intent, "extracted_data": entities}
 
 def tool_node(state: AgentState):
-    """Node gọi các hàm Python để truy vấn dữ liệu."""
+    """Node gọi các hàm Python để truy vấn dữ liệu thực tế từ Entities trích xuất được."""
     if state.get("is_cached"):
         return state
 
@@ -113,8 +109,6 @@ def tool_node(state: AgentState):
 def responder(state: AgentState):
     """Node tạo câu trả lời cuối cùng sử dụng System Prompt."""
     if state.get("is_cached"):
-        # Trả về kết quả từ cache dưới dạng AIMessage
-        from langchain_core.messages import AIMessage
         return {"messages": [AIMessage(content=state["query_results"])]}
 
     results = state.get("query_results")
@@ -140,7 +134,6 @@ workflow.add_node("responder", responder)
 
 workflow.set_entry_point("memory_and_cache")
 
-# Điều hướng: Nếu là cache thì đi thẳng tới responder, nếu không thì đi tới classifier
 def route_after_cache(state: AgentState):
     if state.get("is_cached"):
         return "responder"
@@ -151,19 +144,15 @@ workflow.add_edge("classifier", "tools")
 workflow.add_edge("tools", "responder")
 workflow.add_edge("responder", END)
 
-app = workflow.compile()
+from langgraph.checkpoint.memory import MemorySaver
+
+memory = MemorySaver()
+app = workflow.compile(checkpointer=memory)
 
 if __name__ == "__main__":
     print("--- Chatbot Hàng Không (NEO 2.0) đã sẵn sàng! (Gõ 'exit' để thoát) ---")
     
-    # Khởi tạo state ban đầu
-    state = {
-        "messages": [],
-        "extracted_data": {},
-        "query_results": "",
-        "current_intent": "general",
-        "is_cached": False
-    }
+    config = {"configurable": {"thread_id": "user_session_1"}}
     
     while True:
         user_input = input("\nKhách hàng: ")
@@ -171,17 +160,12 @@ if __name__ == "__main__":
             print("Cảm ơn bạn đã sử dụng dịch vụ. Tạm biệt!")
             break
             
-        # Thêm tin nhắn của user vào state
-        state["messages"].append(HumanMessage(content=user_input))
+        # Chạy Graph với dữ liệu mới và truyền config state vào
+        # Chú ý: LangGraph dùng reducer nên {"messages": [HumanMessage(content=user_input)]} sẽ tự append liên tục
+        state = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
         
-        # Chạy Graph
-        # Lưu ý: Mỗi lần invoke sẽ trả về state mới
-        state = app.invoke(state)
-        
-        # Lấy tin nhắn phản hồi cuối cùng từ Assistant
         final_response = state["messages"][-1].content
         print(f"NEO 2.0: {final_response}")
         
-        # Kiểm tra xem có phải từ cache không để thông báo (Tùy chọn)
         if state.get("is_cached"):
             print("(Phản hồi từ Cache)")
