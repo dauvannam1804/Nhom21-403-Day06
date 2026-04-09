@@ -1,0 +1,17 @@
+# Cấu hình quan trọng nhất
+.env
+
+# Python rác
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Môi trường ảo (uv và venv)
+.venv/
+venv/
+ENV/
+
+# OS rác
+.DS_Store
+Thumbs.db
