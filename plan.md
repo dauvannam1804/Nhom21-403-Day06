@@ -18,13 +18,13 @@ Dự án **NEO 2.0** là phiên bản cải tiến của chatbot hỗ trợ khá
 | **Ly** | Feature 3: Tìm kiếm giá vé | `tools/fare_tools.py` | - Viết hàm `search_fares` tìm kiếm theo chặng bay/ngày. <br> - Sắp xếp giá vé từ thấp đến cao. | Ngày 2-4 |
 | **Tuấn** | Feature 4: Thông tin hành lý | `tools/baggage_tools.py` | - Viết hàm `get_baggage_policy` theo hạng vé (Economy/Business). <br> - Trả về cân nặng/kích thước chi tiết. | Ngày 2-4 |
 
-## 3. Quy Trình Phát Triển Chung (Development Workflow)
+## 3. **Quy Trình Phát Triển Chung (Development Workflow)**
 
 Để hoàn thành dự án, mỗi thành viên cần thực hiện đúng quy trình sau:
-1. **Bước 1: Trích xuất (LLM Extraction):** Sử dụng LLM để parse input người dùng thành JSON schema. (Cần chỉnh sửa prompt trong `prompts/`).
+1. **Bước 1: Trích xuất (LLM Extraction):** Sử dụng LLM để parse input người dùng thành JSON schema. Chỉnh sửa và tham khảo cấu trúc tại [extraction_prompt.txt](file:///home/namdv/workspace/Day06-AI-Product-Hackathon/prompts/extraction_prompt.txt).
 2. **Bước 2: Truy vấn (Python Tool):** Sử dụng các hàm trong thư mục `tools/` để lấy dữ liệu thực tế từ JSON.
 3. **Bước 3: Tích hợp (LangGraph):** Đưa các hàm tool vào LangGraph node trong `main.py`.
-4. **Bước 4: Phản hồi:** Dùng LLM để chuyển dữ liệu thô từ JSON thành câu trả lời thân thiện.
+4. **Bước 4: Phản hồi:** Dùng LLM để chuyển dữ liệu thô từ JSON thành câu trả lời thân thiện. Tham khảo template tại [response_prompt.txt](file:///home/namdv/workspace/Day06-AI-Product-Hackathon/prompts/response_prompt.txt).
 
 ## 4. Kiểm Thử và Triển Khai
 
