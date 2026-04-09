@@ -1,97 +1,44 @@
-# Prototype — NEO 2.0: Chatbot Hỗ trợ Hàng không Vietnam Airlines
+# Kế Hoạch Dự Án Chatbot Hàng Không
 
-## Mô tả
-Chatbot NEO 2.0 hỗ trợ hành khách Vietnam Airlines tra cứu thông tin chuyến bay bằng ngôn ngữ tự nhiên. Hành khách nhập mã chuyến bay (VD: VN123) và ngày khởi hành → hệ thống AI trích xuất intent & entities → truy vấn dữ liệu tĩnh → trả kết quả giờ bay, trạng thái, cửa ra máy bay một cách tự nhiên, chuyên nghiệp.
+## 1. Giới thiệu
+Dự án nhằm xây dựng một chatbot hỗ trợ thông tin du lịch hàng không bám sát vào tài liệu đặc tả (spec-draft). Chatbot áp dụng kiến trúc **Agent** với **LangGraph** để làm luồng điều phối, kết hợp với mô hình LLM mạnh mẽ **gpt-4o-mini** thông qua OpenRouter API để tiến hành "Slot-filling" - bóc tách ngôn ngữ tự nhiên từ câu hỏi của khách hàng thành các tham số chuẩn xác. Toàn bộ dữ liệu tra cứu nội bộ được lấy tập trung từ tệp dữ liệu tĩnh `flight_ticket_fare_data.json`.
 
-## Level: Working prototype
-- Chatbot chạy thật trên Terminal (CLI) với LLM thật (OpenAI `gpt-4o-mini`)
-- Luồng AI hoàn chỉnh: User input → LLM trích xuất (Pydantic Structured Output) → Python tool truy vấn JSON → LLM sinh câu trả lời tự nhiên tiếng Việt
-- Có Memory (MemorySaver) lưu ngữ cảnh hội thoại xuyên suốt phiên chat
-- Có Cache tự động phát hiện câu hỏi trùng lặp, tiết kiệm API call
-- Có Slot-filling thông minh: thiếu mã bay → hỏi lại; mã sai → báo ngay không cần hỏi ngày
+## 2. Phân Công Nhiệm Vụ
 
-## Links
-- **Source code (repo nhóm):** https://github.com/KaitoKidKao/Nhom21-403-Day06
-- **Dữ liệu tra cứu:** `flight_ticket_fare_data.json` (10 chuyến bay, 5 vé, 6 mức giá, 4 quy định hành lý)
-- **Prompt hệ thống Feature 1:** `prompts/feature1_prompt.txt`
+Dự án được bóc tách thành 4 mảng feature độc lập, tương ứng với 4 mũi nhọn phát triển do thành viên nhóm đảm nhiệm. (Timeline gợi ý: 1 tuần/tính năng).
 
-## Tools & Công nghệ
-| Công nghệ | Vai trò |
-|-----------|---------|
-| **LangGraph** | Orchestration — điều phối state machine (Memory → Classifier → Tool → Responder) |
-| **OpenAI gpt-4o-mini** | LLM — trích xuất intent/entities + sinh câu trả lời tự nhiên |
-| **Pydantic v2** | Schema validation — ép LLM trả JSON chuẩn qua Structured Output |
-| **LangChain** | Framework kết nối LLM (ChatOpenAI, SystemMessage, HumanMessage) |
-| **Python + JSON** | Data layer — truy vấn dữ liệu tĩnh từ file `flight_ticket_fare_data.json` |
-| **python-dotenv** | Bảo mật — quản lý API key qua file `.env` |
-| **Antigravity (Gemini)** | Vibe-coding — hỗ trợ thiết kế kiến trúc, viết code, debug và prompt engineering |
+### 2.1. Feature 1: Thông tin chuyến bay (Cao)
+- **Nhiệm vụ:** Thiết lập Agent Node để xử lý ý định tra cứu chuyến bay.
+- **Trích xuất LLM (Entity Extraction):** Phải huấn luyện để LLM bắt đúng biến `flight_code` (Mã chuyến bay) và `date` (Ngày bay format ISO).
+- **Tích hợp Python:** Viết hàm (`get_flight_info`) lấy data từ block `flights` trong file JSON. Xử lý khớp chuỗi in hoa ký tự mã chuyến và kiểm tra tiền tố giờ bay (`scheduled_departure`).
 
-## Kiến trúc Pipeline (LangGraph State Machine)
+### 2.2. Feature 2: Thông tin vé cá nhân (Nam)
+- **Nhiệm vụ:** Triển khai NLU phát hiện & truy vấn vé hành khách bị lạc/cần xem lại.
+- **Trích xuất LLM:** Rút trích 2 biến số `ticket_number` (Chuỗi mã số) và `passenger_name` (Tên hành khách).
+- **Tích hợp Python:** Viết hàm (`get_ticket_details`) tìm kiếm chéo dữ liệu hành khách trong block `tickets`. Phải setup normalization (chuẩn hóa) khi gõ tên hành khách ra chữ In hoa và loại bỏ format nhiễu mới tìm ra được trong JSON.
 
-```
-User Input
-    │
-    ▼
-┌──────────────────┐
-│ memory_and_cache  │  ← Cắt tỉa history (giữ 5 lượt) + kiểm tra cache
-└──────┬───────────┘
-       │
-       ├── cached? ──→ responder (trả ngay, không gọi LLM)
-       │
-       ▼
-┌──────────────────┐
-│   classifier      │  ← LLM + Pydantic: trích xuất intent + entities
-└──────┬───────────┘
-       │
-       ▼
-┌──────────────────┐
-│     tools         │  ← Python functions: truy vấn JSON data
-└──────┬───────────┘   (Pre-check mã chuyến trước khi yêu cầu ngày)
-       │
-       ▼
-┌──────────────────┐
-│   responder       │  ← LLM + feature1_prompt: sinh câu trả lời tiếng Việt
-└──────────────────┘
-       │
-       ▼
-   Bot Response
-```
+### 2.3. Feature 3: Tra cứu giá vé (Ly)
+- **Nhiệm vụ:** Xây dựng tính năng tra cứu mức giá để báo lại cho khách.
+- **Trích xuất LLM:** Hệ thống bắt buộc phải bóc ra được `departure` (Sân bay đi) và `arrival` (Sân bay đến). Bóc phụ thêm `cabin_class` (Hạng ghế).
+- **Tích hợp Python:** Viết hàm (`search_fares`) móc nối dữ liệu 2 chiều. Chú ý: Entity `fares` trong DB không chứa điểm đi/đến. Hàm phải lọc danh sách `flight_code` hợp lệ từ DB `flights` trước, rồi lấy mảng mã chuyến bay đó match tìm dải giá (`price`) ở DB `fares`.
 
-## Phân công
+### 2.4. Feature 4: Hỏi đáp hành lý (Tuấn)
+- **Nhiệm vụ:** Module trả lời quy định trọng lượng túi xách, ký gửi.
+- **Trích xuất LLM:** Bóc tách `cabin_class` (Economy/Business) và phân định `baggage_type` (checked/carry_on).
+- **Tích hợp Python:** Viết hàm (`get_baggage_policy`) query từ block `baggage_rules` JSON. Trả về chính xác cân nặng tối đa (`weight_kg`) và bộ quy chuẩn kích thước (`max_dimensions_cm`).
 
-| Thành viên | Phần phụ trách | Output |
-|-----------|----------------|--------|
-| **Cao** | Feature 1: Thông tin chuyến bay - Logic tìm kiếm chuyến bay theo mã chuyến bay và ngày bay | `tools/flight_tools.py` |
-| **Nam** | Feature 2: Thông tin vé — Logic tìm kiếm vé theo ticket_number/passenger_name | `tools/ticket_tools.py` |
-| **Ly** | Feature 3: Tìm kiếm giá vé — Logic cross-reference bảng flights ↔ fares | `tools/fare_tools.py` |
-| **Tuấn** | Feature 4: Thông tin hành lý — Logic tra cứu policy theo hạng ghế | `tools/baggage_tools.py` |
+## 3. Quy Trình Phát Triển Chung
+Mỗi nhánh tính năng sẽ được tích hợp đúc kết vào bộ xương `main.py` theo chuẩn kiến trúc Pipeline:
+1. **Bóc tách Context (LLM Pydantic):** Tại node `Classifier`, cho LLM (gpt-4o-mini) phân loại Intent trúng 1 trong 4 features, đồng thời điền chuẩn hóa đối tượng (Entities Field).
+2. **Kiểm duyệt (Condition - Python Rules):** Cầm Entity trích được quăng vào Tool. Nếu Entity bị hổng (Thiếu Slot), đẩy ra **System Note** cảnh cáo và bắt luồng chatbot quay vòng ra câu hỏi ngược lại người dùng. (VD: "Thiếu ngày đi, hãy hỏi hành khách đi ngày nào!").
+3. **Phản hồi linh hoạt (Responder Node):** Hàm Tool trả JSON DB cứng ngắc, node Responder sẽ dùng LLM chuyển thể chuỗi text thành câu chăm sóc khách hàng mượt nhất.
 
-## Demo nhanh (CLI)
+## 4. Kiểm Thử và Triển Khai
+- **Test Hàm Độc Lập:** Kiểm tra từng hàm Python (Ví dụ: truyền String thủ công cho hàm Ly bắt cross-reference 2 JSON array) trước khi nối vào LangGraph.
+- **Kiểm thử Edge Cases:** Nhử các câu hỏi lắt léo với mô hình ngôn ngữ (Như gõ lộn xộn ngày, sai format, điền tên thừa dấu). 
+- **Bảo mật & Cấu hình:** Nhất quán gọi file API Key bằng biến môi trường thông qua thư viện `dotenv` từ tệp `.env`. Không đưa file cấu hình này lên Git!
 
-```bash
-# Cài đặt
-pip install -r requirements.txt
-
-# Cấu hình API key
-echo "OPENAI_API_KEY=sk-..." > .env
-
-# Chạy chatbot
-python main.py
-```
-
-**Ví dụ hội thoại thành công:**
-```
-Khách hàng: Chuyến VN123 ngày 10/4 bay lúc mấy giờ?
-NEO 2.0: Xin chào! Chuyến bay VN123 ngày 10/04/2026:
-  - Giờ khởi hành: 08:00
-  - Giờ hạ cánh: 10:15
-  - Tình trạng: Đúng giờ (On Time)
-  Bạn cần hỗ trợ thêm gì không?
-```
-
-**Ví dụ mã chuyến sai (Pre-check hoạt động):**
-```
-Khách hàng: Thông tin mã VN99999
-NEO 2.0: Xin lỗi, mã chuyến bay VN99999 không có trong hệ thống.
-  Vui lòng kiểm tra lại mã chuyến bay, hoặc liên hệ hotline Vietnam Airlines.
-```
+## 5. Tài Liệu Tham Khảo
+- Tài liệu Đặc tả/Design Doc: `spec-draft.md`
+- Central Database: `flight_ticket_fare_data.json` 
+- LangChain & OpenAI Documentation: Function Calling / Structured Output.
