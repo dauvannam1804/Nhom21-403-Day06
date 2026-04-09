@@ -11,6 +11,7 @@ from tools.flight_tools import get_flight_info
 from tools.ticket_tools import get_ticket_details
 from tools.fare_tools import search_fares
 from tools.baggage_tools import get_baggage_policy
+from datetime import datetime
 
 load_dotenv()
 
@@ -67,42 +68,48 @@ def manage_memory_and_cache(state: AgentState):
     return {"messages": messages, "is_cached": False}
 
 def intent_classifier(state: AgentState):
-    """Node phân loại ý định người dùng và trích xuất thực thể."""
+    """Node phân loại ý định và trích xuất thực thể bằng LLM."""
     if state.get("is_cached"):
         return state
 
+    # 1. Đọc prompt và xử lý fallback (từ nhánh cao)
     sys_prompt = read_prompt("extraction_prompt.txt")
     if not sys_prompt:
-        sys_prompt = "Bạn là hệ thống Trích xuất."
+        sys_prompt = "Bạn là hệ thống Trích xuất thông tin hàng không."
 
-    # Lấy thông tin ngày hiện tại để làm base time
-    from datetime import datetime
-    sys_prompt += f"\nLưu ý Context: Hôm nay là {datetime.now().strftime('%Y-%m-%d')}."
-    
-    structured_llm = llm.with_structured_output(ExtractionResult)
-    # Đọc prompt trích xuất từ file txt
-    system_prompt = read_prompt("extraction_prompt.txt")
-    user_query = state["messages"][-1].content
-    
-    # Khôi phục: Phải đưa Lịch sử hội thoại (Memory) vào để LLM Extraction hiểu ngữ cảnh cũ
-    messages = [{"role": "system", "content": system_prompt}]
+    # 2. Thêm ngữ cảnh thời gian thực (từ nhánh cao)
+    today = datetime.now().strftime('%Y-%m-%d')
+    sys_prompt += f"\nLưu ý Context: Hôm nay là ngày {today}."
+
+    # 3. Khôi phục Lịch sử hội thoại - Memory (từ nhánh main)
+    messages = [{"role": "system", "content": sys_prompt}]
     for m in state["messages"][-6:]:
         role = "user" if isinstance(m, HumanMessage) else "assistant"
         messages.append({"role": role, "content": m.content})
+
+    # 4. Gọi LLM 
+    # Option A: Nếu bạn dùng Pydantic (ExtractionResult) như trong nhánh cao:
+    # structured_llm = llm.with_structured_output(ExtractionResult)
+    # response = structured_llm.invoke(messages)
+    # return {"current_intent": response.intent, "extracted_data": response.dict()}
+
+    # Option B: Nếu vẫn dùng JSON Mode như code main hiện tại:
     response = llm.invoke(messages, response_format={"type": "json_object"})
     
     try:
-        # Pass toàn bộ lịch sử trò chuyện (messages) để AI tự nhớ Context
-        messages_to_pass = [SystemMessage(content=sys_prompt)] + state["messages"]
-        result = structured_llm.invoke(messages_to_pass)
+        content = response.content.strip()
+        # Xử lý xóa markdown nếu có
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
         
-        intent = result.intent
-        extracted_data = result.entities.model_dump()
+        extracted_data = json.loads(content)
+        return {
+            "current_intent": extracted_data.get("intent", "general"),
+            "extracted_data": extracted_data
+        }
     except Exception as e:
-        intent = "general"
-        extracted_data = {}
-
-    return {"current_intent": intent, "extracted_data": extracted_data}
+        print(f"Lỗi trích xuất thông tin: {e}")
+        return {"current_intent": "general", "extracted_data": {"intent": "general", "entities": {}}}
 
 def tool_node(state: AgentState):
     """Node gọi các hàm Python để truy vấn dữ liệu thực tế từ Entities trích xuất được."""
