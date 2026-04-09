@@ -126,10 +126,14 @@ def tool_node(state: AgentState):
     elif intent == "fare_search":
         dep = entities.get("departure")
         arr = entities.get("arrival")
+        date = entities.get("date")
+        
         if not dep or not arr:
             query_results = "SYSTEM_NOTE: Vui lòng hỏi khách hàng điểm đi và điểm đến cụ thể để tìm vé."
+        elif not date:
+            query_results = "SYSTEM_NOTE: Khách hàng chưa cung cấp ngày bay. BẮT BUỘC vui lòng hỏi khách hàng xem họ muốn khởi hành vào ngày nào?"
         else:
-            query_results = search_fares(departure=dep, arrival=arr)
+            query_results = search_fares(departure=dep, arrival=arr, date=date)
     elif intent == "baggage_info":
         query_results = get_baggage_policy(
             cabin_class=entities.get("cabin_class"),

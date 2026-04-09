@@ -33,14 +33,14 @@ body::before {
   z-index: -2;
 }
 
-/* Lớp ảnh sắc nét được thu nhỏ (Scale) nằm ở giữa */
+/* Lớp ảnh sắc nét ở giữa */
 body::after {
   content: "";
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
   background-image: url('/a-14.jpg');
-  background-size: contain; /* Tự động thu nhỏ nhét vừa khung hình */
+  background-size: 100vw auto; /* Vừa vặn chiều ngang màn hình, không bị zoom quá đà */
   background-repeat: no-repeat;
   background-position: center;
   z-index: -1;
@@ -48,9 +48,9 @@ body::after {
 
 .chat-container {
   width: 100%;
-  max-width: 380px; /* Thu hẹp lại giống bản gốc */
-  height: 600px; /* Chiều cao cố định */
-  max-height: 85vh;
+  max-width: 440px; /* Tăng chiều rộng lên một chút */
+  height: 680px; /* Tăng chiều cao lên để hiện nhiều nội dung hơn */
+  max-height: 90vh;
   /* Hiệu ứng Kính Mờ (Glassmorphism) */
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px);

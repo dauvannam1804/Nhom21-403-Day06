@@ -5,11 +5,14 @@ import Image from 'next/image';
 
 // Thêm Logo vào thư mục src/app/ (Sử dụng đường dẫn tuyệt đối hoặc relative)
 import vnaLogo from './logo-vna-mobile.png';
+import mascotImg from './mascot.png';
+import userImg from './user.png';
 
 type Message = {
   id: string;
   role: 'user' | 'bot';
   content: string;
+  isRatingRequest?: boolean;
 };
 
 export default function ChatPage() {
@@ -22,6 +25,8 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
+  const [sessionId] = useState(() => 'sess_' + Date.now().toString());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,6 +36,35 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Bộ đếm thời gian 60s đánh giá
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    let timer: NodeJS.Timeout;
+
+    // Chỉ đếm ngược nếu tin nhắn cuối cùng là của bot và chưa từng đánh giá
+    if (lastMsg && lastMsg.role === 'bot' && !lastMsg.isRatingRequest && !hasRated) {
+      timer = setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'bot',
+          content: 'Nếu không còn vấn đề nào khác, Quý khách vui lòng đánh giá mức độ hài lòng để giúp NEO phục vụ tốt hơn nhé!',
+          isRatingRequest: true
+        }]);
+      }, 60000); // Đợi 60 giây (60000 ms)
+    }
+
+    return () => clearTimeout(timer); 
+  }, [messages, hasRated]);
+
+  const handleRate = (stars: number) => {
+    setHasRated(true);
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role: 'bot',
+      content: `Vietnam Airlines xin chân thành cảm ơn Quý khách đã đánh giá ${stars} ⭐. Kính chúc Quý khách một chuyến bay an toàn và tràn ngập niềm vui. Xin chào tạm biệt và hẹn gặp lại! 🎉`
+    }]);
+  };
 
   const handleSubmit = async (e?: React.FormEvent, textOverride?: string) => {
     if (e) e.preventDefault();
@@ -48,7 +82,10 @@ export default function ChatPage() {
       const res = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ 
+          message: userMsg,
+          session_id: sessionId
+        }),
       });
 
       if (!res.ok) throw new Error('Network response was not ok');
@@ -108,8 +145,46 @@ export default function ChatPage() {
 
       <div className="messages">
         {messages.map((msg) => (
-          <div key={msg.id} className={`message ${msg.role}`}>
+          <div key={msg.id} style={{
+            display: 'flex', 
+            gap: '8px', 
+            alignItems: 'flex-end', 
+            alignSelf: msg.role === 'bot' ? 'flex-start' : 'flex-end', 
+            maxWidth: '92%'
+          }}>
+            {msg.role === 'bot' && (
+              <Image src={mascotImg} alt="NEO Mascot" width={36} height={36} style={{ flexShrink: 0, borderRadius: '50%', objectFit: 'contain', background: 'rgba(255,255,255,0.8)', padding: '2px', border: '1px solid #ddd' }} />
+            )}
+            
+            <div className={`message ${msg.role}`} style={{ alignSelf: 'auto', maxWidth: '100%', margin: 0 }}>
             {renderMessageContent(msg.content)}
+            
+            {/* Hiển thị thanh đánh giá 5 sao nếu đây là tin nhắn yêu cầu đánh giá */}
+            {msg.isRatingRequest && !hasRated && (
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'center' }}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <span 
+                    key={star} 
+                    onClick={() => handleRate(star)}
+                    style={{ 
+                      cursor: 'pointer', 
+                      fontSize: '28px', 
+                      color: '#D4A017', /* Màu Vàng Gold đặc trưng VNA */
+                      transition: 'transform 0.1s ease',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+            )}
+            </div>
+            
+            {msg.role === 'user' && (
+              <Image src={userImg} alt="User" width={36} height={36} style={{ flexShrink: 0, borderRadius: '50%', objectFit: 'cover' }} />
+            )}
           </div>
         ))}
         
